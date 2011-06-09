@@ -85,10 +85,26 @@ for symbol in rs_ordered_symbols:
 
 # Plot the fifty day moving averages
 for symbol in symbols:
+
+    # Get the moving average history
     ma_history = fifty_day_ma_history[symbol]
     N = len(ma_history)
+
+    # Get the closing prices
+    closing_prices = map(lambda e : e[4], history[symbol][1:])
+
+    # Remove the last 49 days of price information so that the closing
+    # price list is as long as the moving average list
+    closing_prices = closing_prices[:-49]
+
+    # Create the indices
     ind = np.arange(N)
     dates = map(lambda tup : tup[0],history[symbol][1:N+1])
+
+    # Reverse the lists so the oldest data is first
+    dates.reverse()
+    ma_history.reverse()
+    closing_prices.reverse()
 
     def format_date(x, pos=None):
         thisind = np.clip(int(x+0.5), 0, N-1)
@@ -96,10 +112,14 @@ for symbol in symbols:
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(ind, ma_history, 'o-')
+    ax.plot(ind, closing_prices)
+    ax.plot(ind, ma_history, 'r--')
     ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_date))
     fig.autofmt_xdate()
-
+    plt.xlabel('Date')
+    plt.ylabel('Price')
+    plt.title('Symbol: %s' % symbol)
+    plt.grid()
     plt.draw()
     
 
