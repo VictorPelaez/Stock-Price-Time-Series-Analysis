@@ -74,17 +74,30 @@ rs.sort(key = lambda tup : tup[1],reverse = True)
 rs_ordered_symbols = map(lambda tup : tup[0],rs)
 
 # Print out the performance figures
-print "3 MO\t6 MO\t1 YR\tRS\tSYMB"
+print "3 MO\t6 MO\t1 YR\tRS\t50DAY\t200DAY\tBUY\tSYMB"
 for symbol in rs_ordered_symbols:
+
+    # Add the performance numbers to the display string
     keys = ['3mo','6mo','1yr','rs']
     s = ''
     for key in keys:
         s += "%.1f\t" % (performance[symbol][key]*100.0)
+    fifty = float(get_50day_moving_avg(symbol))
+    twohund = float(get_200day_moving_avg(symbol))
+    s += "%.2f\t%.2f\t" % (fifty,twohund)
+
+    # Check to see if the 50 day moving average is above the 200 day moving average
+    if fifty > twohund:
+        s += "YES\t"
+    else:
+        s += "NO\t"
+
+    # Add the symbol label
     s += "%s" % symbol
     print s
 
 # Plot the fifty day moving averages
-for symbol in symbols:
+for symbol in rs_ordered_symbols:
 
     # Get the moving average history
     ma_history = fifty_day_ma_history[symbol]
