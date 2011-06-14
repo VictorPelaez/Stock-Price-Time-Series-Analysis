@@ -82,7 +82,7 @@ rs.sort(key = lambda tup : tup[1],reverse = True)
 rs_ordered_symbols = map(lambda tup : tup[0],rs)
 
 # Print out the performance figures
-print "3 MO\t6 MO\t1 YR\tRS\t50DAY\t200DAY\tBUY\tSYMB"
+print "3 MO\t6 MO\t1 YR\tRS\t50DAY\t200DAY\tBUY\tCHNG\tSYMB"
 for symbol in rs_ordered_symbols:
 
     # Add the performance numbers to the display string
@@ -96,6 +96,15 @@ for symbol in rs_ordered_symbols:
 
     # Check to see if the 50 day moving average is above the 200 day moving average
     if fifty > twohund:
+        s += "YES\t"
+    else:
+        s += "NO\t"
+
+    # Check to see if the 50 day and 200 day moving averages just crossed
+    # TODO: Might want to check to see if a crossing has happened in the last seven days
+    prev_fifty = fifty_day_ma_history[symbol][1]
+    prev_twohund = twohund_day_ma_history[symbol][1]
+    if (fifty-twohund)*(prev_fifty-prev_twohund) < 0:
         s += "YES\t"
     else:
         s += "NO\t"
