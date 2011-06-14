@@ -5,6 +5,20 @@ import matplotlib.ticker as ticker
 from datetime    import date
 from dateutil    import parser
 from ystockquote import *
+from matplotlib.backends.backend_pdf import PdfPages
+
+def simple_moving_average(price_history,days):
+    ma_history = []
+    window = price_history[:days]
+    for i in xrange(len(price_history)-days+1):
+        ma_history.append(sum(window)/float(days))
+
+        # Update the window as necessary
+        if i < len(price_history)-days:
+            del window[0]
+            window.append(price_history[days+i])
+    
+    return ma_history
 
 # Load the symbols to analyze
 f = open('symbols.txt','r')
@@ -34,23 +48,17 @@ for symbol in symbols:
         # Add the list back to the history
         history[symbol].append(new_element)
 
-# Compute 50 day moving averages of closing price
+# Compute 50 and 200 day moving averages of closing price
 fifty_day_ma_history = {}
+twohund_day_ma_history = {}
 for symbol in symbols:
-    fifty_day_ma_history[symbol] = []
 
     # Get closing price history for symbol
-    closing_prices = map(lambda e : e[4], history[symbol][1:])
+    closing_prices = map(lambda e : e[4],history[symbol][1:])
 
     # Compute moving averages
-    fifty_day_window = closing_prices[:50]
-    for i in xrange(len(closing_prices)-49):
-        fifty_day_ma_history[symbol].append(sum(fifty_day_window)/50.0)
-
-        # Update the window as necessary
-        if i < len(closing_prices)-50:
-            del fifty_day_window[0]
-            fifty_day_window.append(closing_prices[50+i])
+    fifty_day_ma_history[symbol] = simple_moving_average(closing_prices,50)
+    twohund_day_ma_history[symbol] = simple_moving_average(closing_prices,200)
 
 # Compute 3 month, 6 month and 1 year performance based on smoothed closing prices
 # along with the relative strength. Will use 13 week, 26 week and 52 week lags for 
@@ -82,8 +90,8 @@ for symbol in rs_ordered_symbols:
     s = ''
     for key in keys:
         s += "%.1f\t" % (performance[symbol][key]*100.0)
-    fifty = float(get_50day_moving_avg(symbol))
-    twohund = float(get_200day_moving_avg(symbol))
+    fifty = fifty_day_ma_history[symbol][0] 
+    twohund = twohund_day_ma_history[symbol][0] 
     s += "%.2f\t%.2f\t" % (fifty,twohund)
 
     # Check to see if the 50 day moving average is above the 200 day moving average
@@ -96,43 +104,39 @@ for symbol in rs_ordered_symbols:
     s += "%s" % symbol
     print s
 
-# Plot the fifty day moving averages
+# Plot the price and moving average histories
+pp = PdfPages('figures.pdf')
 for symbol in rs_ordered_symbols:
 
-    # Get the moving average history
-    ma_history = fifty_day_ma_history[symbol]
-    N = len(ma_history)
+    # Get the moving average histories
+    fd_ma_history = fifty_day_ma_history[symbol]
+    thd_ma_history = twohund_day_ma_history[symbol]
 
-    # Get the closing prices
-    closing_prices = map(lambda e : e[4], history[symbol][1:])
-
-    # Remove the last 49 days of price information so that the closing
-    # price list is as long as the moving average list
-    closing_prices = closing_prices[:-49]
-
-    # Create the indices
-    ind = np.arange(N)
-    dates = map(lambda tup : tup[0],history[symbol][1:N+1])
+    # Get the dates and closing prices
+    dates = map(lambda tup : tup[0],history[symbol][1:])
+    closing_prices = map(lambda tup : tup[4],history[symbol][1:])
 
     # Reverse the lists so the oldest data is first
     dates.reverse()
-    ma_history.reverse()
+    fd_ma_history.reverse()
+    thd_ma_history.reverse()
     closing_prices.reverse()
 
-    def format_date(x, pos=None):
-        thisind = np.clip(int(x+0.5), 0, N-1)
-        return dates[thisind].strftime('%Y-%m-%d')
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(ind, closing_prices)
-    ax.plot(ind, ma_history, 'r--')
-    ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_date))
-    fig.autofmt_xdate()
-    plt.xlabel('Date')
+    # Generate the plot
+    price_history_days = len(closing_prices)
+    plt.figure()
+    plt.plot(closing_prices,label='Closing Price')
+    plt.plot(range(49,price_history_days),fd_ma_history,label='50 Day MA',color='r')
+    plt.plot(range(199,price_history_days),thd_ma_history,label='200 Day MA',color='g')
+    plt.legend(loc='lower left')
+    plt.xlabel('Days')
     plt.ylabel('Price')
     plt.title('Symbol: %s' % symbol)
     plt.grid()
     plt.draw()
     
+    # Save plot to the PDF file
+    pp.savefig()
 
+# Close the PDF file
+pp.close()
