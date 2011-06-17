@@ -4,8 +4,9 @@ import matplotlib.mlab   as mlab
 import matplotlib.ticker as ticker
 from datetime    import date
 from dateutil    import parser
-from ystockquote import *
 from matplotlib.backends.backend_pdf import PdfPages
+from ystockquote import *
+from gmail import *
 
 def simple_moving_average(price_history,days):
     ma_history = []
@@ -82,36 +83,38 @@ rs.sort(key = lambda tup : tup[1],reverse = True)
 rs_ordered_symbols = map(lambda tup : tup[0],rs)
 
 # Print out the performance figures
-print "3 MO\t6 MO\t1 YR\tRS\t50DAY\t200DAY\tBUY\tCHNG\tSYMB"
+num_ma_crossings = 0
+stats = "3 MO\t6 MO\t1 YR\tRS\t50DAY\t200DAY\tBUY\tCHNG\tSYMB\n"
 for symbol in rs_ordered_symbols:
 
     # Add the performance numbers to the display string
     keys = ['3mo','6mo','1yr','rs']
-    s = ''
     for key in keys:
-        s += "%.1f\t" % (performance[symbol][key]*100.0)
+        stats += "%.1f\t" % (performance[symbol][key]*100.0)
     fifty = fifty_day_ma_history[symbol][0] 
     twohund = twohund_day_ma_history[symbol][0] 
-    s += "%.2f\t%.2f\t" % (fifty,twohund)
+    stats += "%.2f\t%.2f\t" % (fifty,twohund)
 
     # Check to see if the 50 day moving average is above the 200 day moving average
     if fifty > twohund:
-        s += "YES\t"
+        stats += "YES\t"
     else:
-        s += "NO\t"
+        stats += "NO\t"
 
     # Check to see if the 50 day and 200 day moving averages just crossed
     # TODO: Might want to check to see if a crossing has happened in the last seven days
     prev_fifty = fifty_day_ma_history[symbol][1]
     prev_twohund = twohund_day_ma_history[symbol][1]
     if (fifty-twohund)*(prev_fifty-prev_twohund) < 0:
-        s += "YES\t"
+        stats += "YES\t"
+        num_ma_crossings += 1
     else:
-        s += "NO\t"
+        stats += "NO\t"
 
     # Add the symbol label
-    s += "%s" % symbol
-    print s
+    stats += "%s\n" % symbol
+
+print stats
 
 # Plot the price and moving average histories
 pp = PdfPages('figures.pdf')
@@ -149,3 +152,26 @@ for symbol in rs_ordered_symbols:
 
 # Close the PDF file
 pp.close()
+
+# Write out the performance results to a text file
+f = open('performance.txt','w')
+f.write(stats)
+f.close()
+
+# Load email credentials
+f = open('credentials.txt','r')
+cred = f.readlines()
+f.close()
+cred = map(lambda s : s[:-1],cred)
+user,password = cred
+
+# Load recipients
+f = open('recipients.txt','r')
+addresses = f.readlines()
+f.close()
+addresses = map(lambda s : s[:-1],addresses)
+
+# Email the results
+text = 'Number of moving average crossings today: %d\n\n' % num_ma_crossings
+for recipient in addresses:
+    send_mail('Ivy Portfolio Metrics',text,['performance.txt','figures.pdf'],user,password,recipient)
