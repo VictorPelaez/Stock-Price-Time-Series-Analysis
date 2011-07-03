@@ -1,18 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.mlab   as mlab
-import matplotlib.ticker as ticker
 from datetime    import date
 from dateutil    import parser
+from math        import sqrt
 from matplotlib.backends.backend_pdf import PdfPages
 from ystockquote import *
 from gmail import *
 
 def simple_moving_average(price_history,days):
-    ma_history = []
-    window = price_history[:days]
+    ma_history = np.zeros(len(price_history)-days+1)
+    window = list(price_history[:days])
     for i in xrange(len(price_history)-days+1):
-        ma_history.append(sum(window)/float(days))
+        ma_history[i] = sum(window)/float(days)
 
         # Update the window as necessary
         if i < len(price_history)-days:
@@ -20,6 +19,37 @@ def simple_moving_average(price_history,days):
             window.append(price_history[days+i])
     
     return ma_history
+    
+def exponential_moving_average(price_history,days):
+    alpha = 2/float(days+1)
+    ma_history = np.zeros(len(price_history))
+    
+    # Filter the price history under the assumption that the history 
+    # begins with the most recent price data
+    ma_prev = price_history[-1]
+    ma_history[-1] = price_history[-1]
+    for i in xrange(len(price_history)-2,-1,-1):
+        ma_history[i] = (1-alpha)*ma_prev + alpha*price_history[i]
+        ma_prev = ma_history[i]
+        
+    return(ma_history)
+    
+def bollinger_bands(price_history):
+    # Compute the 20 day simple moving average for the middle band
+    middle_band = simple_moving_average(price_history,20)
+    
+    # Compute the squared deviations from the middle band
+    sq_deviations = np.zeros(len(middle_band))
+    for i in xrange(len(middle_band)):
+        sq_deviations[i] = pow(price_history[i]-middle_band[i],2)
+
+    # Compute the 20 day simple moving average of the squared deviations 
+    std_deviations = simple_moving_average(sq_deviations,20)
+    
+    # Take the square root to get the standard deviations
+    std_deviations = np.array(map(sqrt,std_deviations))
+    
+    return [middle_band,std_deviations]
 
 # Load the symbols to analyze
 f = open('symbols.txt','r')
@@ -54,7 +84,7 @@ fifty_day_ma_history = {}
 twohund_day_ma_history = {}
 for symbol in symbols:
 
-    # Get closing price history for symbol
+    # Get closing price history for symbol - latest price data occurs earliest in list
     closing_prices = map(lambda e : e[4],history[symbol][1:])
 
     # Compute moving averages
@@ -64,7 +94,7 @@ for symbol in symbols:
 # Compute 3 month, 6 month and 1 year performance based on smoothed closing prices
 # along with the relative strength. Will use 13 week, 26 week and 52 week lags for 
 # computations. Relative strength is defined here as the average of the 3 month, 
-# 6 month and 1 year performance.
+# 6 month and 1 year performance as suggested in "The Ivy Portfolio".
 performance = {}
 for symbol in symbols:
     symbol_perf = {}
@@ -128,16 +158,27 @@ for symbol in rs_ordered_symbols:
     dates = map(lambda tup : tup[0],history[symbol][1:])
     closing_prices = map(lambda tup : tup[4],history[symbol][1:])
 
+    # Compute the Bollinger bands
+    [middle_band,std_deviations] = bollinger_bands(closing_prices)
+    upper_band = middle_band[:len(std_deviations)] + 2*std_deviations
+    lower_band = middle_band[:len(std_deviations)] - 2*std_deviations
+    
     # Reverse the lists so the oldest data is first
     dates.reverse()
-    fd_ma_history.reverse()
-    thd_ma_history.reverse()
-    closing_prices.reverse()
+    fd_ma_history  = fd_ma_history[::-1]
+    thd_ma_history = thd_ma_history[::-1]
+    closing_prices = closing_prices[::-1]
+    middle_band    = middle_band[::-1]
+    upper_band     = upper_band[::-1]
+    lower_band     = lower_band[::-1]
 
     # Generate the plot
     price_history_days = len(closing_prices)
     plt.figure()
     plt.plot(closing_prices,label='Closing Price')
+    plt.plot(range(19,price_history_days),middle_band,'c',label='20 Day MA')
+    plt.plot(range(38,price_history_days),upper_band,'c--')
+    plt.plot(range(38,price_history_days),lower_band,'c--')    
     plt.plot(range(49,price_history_days),fd_ma_history,label='50 Day MA',color='r')
     plt.plot(range(199,price_history_days),thd_ma_history,label='200 Day MA',color='g')
     plt.legend(loc='lower left')
